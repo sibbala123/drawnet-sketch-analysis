@@ -1,0 +1,51 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Environments ──────────────────────────────────────────────────────────────
+.env
+.venv
+venv/
+env/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── Data — raw and processed (too large for git) ──────────────────────────────
+drawnet/data/raw/quickdraw/*.npy
+drawnet/data/raw/tuberlin/
+drawnet/data/raw/dap/
+drawnet/data/raw/obget/
+drawnet/data/raw/kaggle_children/
+drawnet/data/augmented/images/
+drawnet/data/augmented/index.csv
+drawnet/data/augmented/train.csv
+drawnet/data/augmented/test.csv
+drawnet/data/processed/
+
+# ── Model outputs ─────────────────────────────────────────────────────────────
+drawnet/outputs/checkpoints/
+drawnet/outputs/logs/
+drawnet/outputs/results/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Kaggle credentials (never commit) ────────────────────────────────────────
+kaggle.json

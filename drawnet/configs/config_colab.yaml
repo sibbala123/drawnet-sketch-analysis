@@ -1,0 +1,69 @@
+data:
+  quickdraw_dir: data/raw/quickdraw
+  tuberlin_dir: data/raw/tuberlin
+  cache_dir: data/augmented
+  annotations_csv: data/processed/master_annotations.csv
+  quickdraw_samples_per_class: 5000
+  image_size: 224
+  deviation_fraction: 0.20
+  train_split: 0.80
+  test_split: 0.20
+
+model:
+  backbone: resnet50
+  pretrained: true           # Colab can download ImageNet weights (no SSL block)
+  freeze_layers: true
+  num_intent_classes: 30
+  num_deviation_classes: 4
+
+training:
+  epochs: 50
+  batch_size: 64             # T4 has 15GB VRAM
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  lambda1: 1.0
+  lambda2: 1.0
+  scheduler: cosine_annealing
+  num_workers: 4             # Colab supports multiple workers
+
+deviation_classes:
+  - rotation
+  - closure_failure
+  - spatial_disorganization
+  - size_distortion
+
+# QuickDraw categories (labels 0-9)
+quickdraw_categories:
+  - face
+  - house
+  - tree
+  - cat
+  - car
+  - bird
+  - dog
+  - fish
+  - flower
+  - bicycle
+
+# TU-Berlin categories (labels 10-29)
+tuberlin_categories:
+  - airplane
+  - butterfly
+  - elephant
+  - horse
+  - rabbit
+  - bear_(animal)
+  - mushroom
+  - cup
+  - umbrella
+  - shoe
+  - guitar
+  - snake
+  - spider
+  - apple
+  - sun
+  - bridge
+  - castle
+  - palm_tree
+  - eye
+  - chair

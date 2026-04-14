@@ -1,0 +1,70 @@
+data:
+  quickdraw_dir: data/raw/quickdraw
+  tuberlin_dir: data/raw/tuberlin
+  cache_dir: data/augmented
+  annotations_csv: data/processed/master_annotations.csv
+  quickdraw_samples_per_class: 5000
+  image_size: 224
+  deviation_fraction: 0.20   # fraction of combined dataset that gets deviations applied
+  train_split: 0.80          # of train.csv: 80% train / 20% val (internal split in train.py)
+  test_split: 0.20           # split_dataset.py: 20% held-out test set
+
+model:
+  backbone: resnet50
+  pretrained: false          # set true on Colab (SSL cert blocks download on Windows)
+  freeze_layers: true
+  num_intent_classes: 30
+  num_deviation_classes: 4
+
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  lambda1: 1.0
+  lambda2: 1.0
+  scheduler: cosine_annealing
+  num_workers: 2
+
+deviation_classes:
+  - rotation
+  - closure_failure
+  - spatial_disorganization
+  - size_distortion
+
+# QuickDraw categories (labels 0-9)
+quickdraw_categories:
+  - face
+  - house
+  - tree
+  - cat
+  - car
+  - bird
+  - dog
+  - fish
+  - flower
+  - bicycle
+
+# TU-Berlin categories (labels 10-29)
+# Folder names on disk (spaces replaced with underscores, parentheses with underscores)
+tuberlin_categories:
+  - airplane
+  - butterfly
+  - elephant
+  - horse
+  - rabbit
+  - bear_(animal)
+  - mushroom
+  - cup
+  - umbrella
+  - shoe
+  - guitar
+  - snake
+  - spider
+  - apple
+  - sun
+  - bridge
+  - castle
+  - palm_tree
+  - eye
+  - chair
