@@ -1,7 +1,7 @@
 """
 DrawNet Model
 -------------
-Shared ResNet-50 backbone with two task-specific heads:
+Shared backbone with two task-specific heads:
 
   Intent head    : softmax classification over 30 intent categories
                    Loss -> CrossEntropyLoss
@@ -9,11 +9,14 @@ Shared ResNet-50 backbone with two task-specific heads:
   Deviation head : multi-label sigmoid over 4 deviation classes
                    Loss -> BCEWithLogitsLoss with pos_weight
 
-All images have a valid intent label — no masking required.
+Supported backbones  (set via backbone_name):
+  resnet50         -> 2048-dim features  (default)
+  efficientnet_b3  -> 1536-dim features
+  convnext_tiny    ->  768-dim features
 
 Backbone unfreezing schedule (controlled from train.py):
   Phase 1  epochs  1-10  : backbone fully frozen  -> only heads train
-  Phase 2  epochs 11-20  : unfreeze layer4         -> fine-tune deep features
+  Phase 2  epochs 11-20  : unfreeze last stage     -> fine-tune deep features
   Phase 3  epochs 21+    : unfreeze all layers     -> full fine-tuning at low LR
 """
 
@@ -30,6 +33,8 @@ class DrawNet(nn.Module):
         Number of sketch categories (intent head output size). Default 30.
     num_deviation_classes : int
         Number of deviation types (deviation head output size). Default 4.
+    backbone_name : str
+        One of 'resnet50', 'efficientnet_b3', 'convnext_tiny'.
     pretrained : bool
         Load ImageNet weights for the backbone.
     freeze_backbone : bool
@@ -38,26 +43,29 @@ class DrawNet(nn.Module):
         Dropout probability applied before each head's first linear layer.
     """
 
+    FEAT_DIMS = {
+        "resnet50":        2048,
+        "efficientnet_b3": 1536,
+        "convnext_tiny":    768,
+    }
+
     def __init__(
         self,
         num_intent_classes:    int   = 30,
         num_deviation_classes: int   = 4,
+        backbone_name:         str   = "resnet50",
         pretrained:            bool  = True,
         freeze_backbone:       bool  = True,
         dropout:               float = 0.5,
     ):
         super().__init__()
+        self.backbone_name = backbone_name
 
         # ── Backbone ──────────────────────────────────────────────────────────
-        weights        = models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
-        resnet         = models.resnet50(weights=weights)
-        self.backbone  = nn.Sequential(*list(resnet.children())[:-1])
-        # Output: (B, 2048, 1, 1) -> flatten to (B, 2048)
+        self.backbone, feat_dim = self._build_backbone(backbone_name, pretrained)
 
         if freeze_backbone:
             self._freeze_backbone()
-
-        feat_dim = 2048
 
         # ── Intent head ───────────────────────────────────────────────────────
         self.intent_head = nn.Sequential(
@@ -74,6 +82,36 @@ class DrawNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(256, num_deviation_classes),
         )
+
+    @staticmethod
+    def _build_backbone(backbone_name: str, pretrained: bool):
+        """Returns (backbone_module, feat_dim)."""
+        if backbone_name == "resnet50":
+            weights  = models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
+            base     = models.resnet50(weights=weights)
+            backbone = nn.Sequential(*list(base.children())[:-1])
+            # output: (B, 2048, 1, 1)
+            return backbone, 2048
+
+        elif backbone_name == "efficientnet_b3":
+            weights  = models.EfficientNet_B3_Weights.IMAGENET1K_V1 if pretrained else None
+            base     = models.efficientnet_b3(weights=weights)
+            backbone = nn.Sequential(base.features, base.avgpool)
+            # output: (B, 1536, 1, 1)
+            return backbone, 1536
+
+        elif backbone_name == "convnext_tiny":
+            weights  = models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1 if pretrained else None
+            base     = models.convnext_tiny(weights=weights)
+            backbone = nn.Sequential(base.features, base.avgpool)
+            # output: (B, 768, 1, 1)
+            return backbone, 768
+
+        else:
+            raise ValueError(
+                f"Unknown backbone: {backbone_name!r}. "
+                "Choose from: resnet50, efficientnet_b3, convnext_tiny"
+            )
 
     def forward(self, x: torch.Tensor):
         """
@@ -100,21 +138,29 @@ class DrawNet(nn.Module):
     def unfreeze_phase(self, phase: int):
         """
         Progressive backbone unfreezing.
-          phase 1 -> unfreeze layer4 only
+          phase 1 -> unfreeze last stage only
           phase 2 -> unfreeze all backbone layers
         """
         if phase == 1:
-            layer4 = list(self.backbone.children())[7]
-            for param in layer4.parameters():
+            if self.backbone_name == "resnet50":
+                last_stage = self.backbone[7]          # layer4
+            else:
+                last_stage = self.backbone[0][-1]      # last block of features
+            for param in last_stage.parameters():
                 param.requires_grad = True
-            print("[DrawNet] Unfroze backbone layer4.")
+            print(f"[DrawNet] Unfroze backbone last stage ({self.backbone_name}).")
         elif phase == 2:
             for param in self.backbone.parameters():
                 param.requires_grad = True
-            print("[DrawNet] Unfroze full backbone.")
+            print(f"[DrawNet] Unfroze full backbone ({self.backbone_name}).")
 
     def trainable_params(self):
         return [p for p in self.parameters() if p.requires_grad]
+
+    def param_count(self):
+        total     = sum(p.numel() for p in self.parameters())
+        trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        return total, trainable
 
 
 # ── Multi-task loss ────────────────────────────────────────────────────────────

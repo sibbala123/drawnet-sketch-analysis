@@ -157,10 +157,16 @@ def main():
     parser.add_argument("--device", default=None)
     parser.add_argument("--resume", default=None,
                         help="Path to checkpoint to resume from")
+    parser.add_argument("--run_name", default=None,
+                        help="Sub-folder under outputs/ for logs/checkpoints/results. "
+                             "Defaults to the backbone name from config.")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
     seed_everything(42)
+
+    backbone_name = cfg["model"].get("backbone", "resnet50")
+    run_name      = args.run_name or backbone_name
 
     global _XM
     if args.device == "tpu":
@@ -202,13 +208,16 @@ def main():
     pos_weights = train_ds.compute_pos_weights().to(device)
 
     # ── Model ─────────────────────────────────────────────────────────────────
-    print("\nBuilding model ...")
+    print(f"\nBuilding model (backbone={backbone_name}) ...")
     model = DrawNet(
         num_intent_classes    = cfg["model"]["num_intent_classes"],
         num_deviation_classes = cfg["model"]["num_deviation_classes"],
+        backbone_name         = backbone_name,
         pretrained            = cfg["model"]["pretrained"],
         freeze_backbone       = cfg["model"]["freeze_layers"],
     ).to(device)
+    total_p, trainable_p = model.param_count()
+    print(f"  Total params: {total_p/1e6:.1f}M  |  Trainable: {trainable_p/1e6:.1f}M")
 
     criterion = DrawNetLoss(
         pos_weight = pos_weights,
@@ -248,9 +257,10 @@ def main():
         print(f"Resumed from epoch {start_epoch}")
 
     # ── Logging ───────────────────────────────────────────────────────────────
-    log_dir  = pathlib.Path("outputs/logs")
-    ckpt_dir = pathlib.Path("outputs/checkpoints")
-    res_dir  = pathlib.Path("outputs/results")
+    out_base = pathlib.Path("outputs") / run_name
+    log_dir  = out_base / "logs"
+    ckpt_dir = out_base / "checkpoints"
+    res_dir  = out_base / "results"
     for d in [log_dir, ckpt_dir, res_dir]:
         d.mkdir(parents=True, exist_ok=True)
 
